@@ -1,15 +1,3 @@
-/** To Do
- * 
- * X Allow user to choose from subject line or first line of email body as the title of the Notion page (as fallback if "name" property is not present in email body)
- * X Allow user to choose if page title is followed/preceded by a ✉️ emoji
- * X Make date parsing more robust with error handling
- * X Add support for "label" property
- * X Add support for "priority" property
- * X Add support for "smart list" property
- * X Add support for "status" property
- * X Add support for "tag" property
- */
-
 import * as cheerio from 'cheerio'
 import TurndownService from 'turndown'
 import * as chrono from 'chrono-node'
@@ -250,16 +238,12 @@ export default defineComponent({
         const parseDueDate = (dueText, referenceDateString) => {
             if (!dueText || isPlaceholder(dueText)) return null
 
-            console.log('Due Text:', dueText)
-            console.log('Reference Date String:', referenceDateString)
-
             // Extract timezone offset from the ISO string
             const tzMatch = referenceDateString.match(/([+-]\d{2}):(\d{2})$/)
             if (!tzMatch) return null
 
             // Parse the reference date string directly (it's already in the correct timezone)
             const referenceDate = new Date(referenceDateString)
-            console.log('Reference Date:', referenceDate.toISOString())
 
             // Try parsing as MM/DD/YYYY or DD/MM/YYYY based on format preference
             const dateRegex = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{2}|\d{4}))?$/
@@ -288,7 +272,6 @@ export default defineComponent({
             // Parse with chrono using the reference date
             const parsed = chrono.parseDate(dueText, referenceDate, { forwardDate: true })
             if (parsed) {
-                console.log('Chrono Parse Result:', parsed)
                 
                 // Extract the timezone offset in minutes
                 const [_, tzHours, tzMinutes] = tzMatch
@@ -296,7 +279,6 @@ export default defineComponent({
                 
                 // Adjust the parsed date back to the original timezone
                 const adjustedDate = new Date(parsed.getTime() + (tzOffsetMinutes * 60000))
-                console.log('Timezone Adjusted Result:', adjustedDate.toISOString())
                 
                 // Return just the date portion
                 return adjustedDate.toISOString().split('T')[0]
@@ -385,10 +367,15 @@ export default defineComponent({
                         
                         case 'due':
                             // Pass the raw timezone string instead of creating a Date object
-                            const tzValue = steps.get_current_time_in_specific_timezone.$return_value
-                            console.log('Timezone Return Value:', tzValue)
+                            let tzValue;
+
+                            if (steps.get_current_time_in_specific_timezone?.$return_value) {
+                              tzValue = steps.get_current_time_in_specific_timezone?.$return_value
+                            } else {
+                              tzValue = steps.trigger.context.ts.replace(/\.\d+Z/, "") + "+00:00"
+                              console.warn("Warning: User has not set up a Get Current Time in Timezone step. Relative due dates may be incorrect due to assumption of GMT timezone.")
+                            }
                             result[field] = parseDueDate(value, tzValue)
-                            console.log('Final Due Date Result:', result[field])
                             break
                         
                         case 'email link':
